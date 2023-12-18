@@ -1,0 +1,17 @@
+#version: '3.9'
+
+services:
+ 
+  warp_api:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    develop:
+      watch:
+        - action: sync
+          path: ./
+          target: /app
+        - action: rebuild
+          path: package.json
+    ports:
+      - "8888:8888"

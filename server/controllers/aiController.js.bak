@@ -1,0 +1,99 @@
+import { textOnly } from "../utils/textOnly.js";
+import { textAndImage } from "../utils/textAndImage.js";
+import fetch from 'node-fetch';
+import axios from 'axios';
+
+export const aiController = async (req, res) => {
+  //const modelType = req.body.modelType;  
+  const modelType = "text_only";
+  const textType = req.body.textType;
+  const receivedName = req.body.receivedName;
+  const groupName = req.body.groupName;
+  let prompt = "尝试在下列内容中提取商品名称,数量，单位，如果没有识别或提取到数量，则默认数量为1，如果没有识别或提取到单位，则默认为空值，最后把结果warp为json格式输出: ";
+  let text;
+  switch (textType) {
+        case 1:
+            const spoken = req.body.spoken;
+            // Generate and return your specific prompt based on 'spoken'
+            prompt = prompt.concat(spoken);
+            break;
+        default:
+            prompt = ''; // Or handle other cases as needed
+  }  
+
+  if (modelType === "text_only") {
+    if (prompt != "") 
+    {
+  	let timeoutFlag = false;
+
+  	const botReplyPromise = textOnly(prompt);
+
+  	const responseTimeout = setTimeout(() => {
+    		if (!timeoutFlag) {
+      			timeoutFlag = true;
+      		res.status(200).send('请稍等'); // Send "please wait"
+    		}
+  	}, 3000);
+
+  	const botReply = await botReplyPromise;
+  	clearTimeout(responseTimeout); // Clear the timeout
+	//const botReply = await textOnly(prompt);
+	if (!timeoutFlag) {
+
+    		if (botReply?.Error) {
+      			return res.status(404).json({ Error: botReply.Error });
+    		}	
+    		const response = {
+        		code: 0, // You can define the code based on your logic
+        		message: "Success", // Or any relevant message
+        		data: {
+            			type: 5000,
+            		info: {
+                		text: botReply.result
+            		}
+        		}
+    		};
+    		res.status(200).json(response);
+	} else {
+  		const asyncResponse = {
+    			socketType: 2,
+    			list: [{
+        			type: 203,
+        			titleList: [groupName], // Replace with actual names
+        			receivedContent: botReply.result,// Use the result from botReply
+				atList: [receivedName]
+      				}]
+  			};
+
+  		// Send the asynchronous response to the specified endpoint
+  		await axios.post('https://api.worktool.ymdyes.cn/wework/sendRawMessage?robotId=wt1do3mp4j4zu7g379aexgfosojp0smq', asyncResponse, {
+    		headers: {'Content-Type': 'application/json'}
+  		});	
+	}
+    	//res.status(200).json({ result: botReply.result });
+    } else {
+	text = "";
+    }
+    const response = {
+        code: 0, // You can define the code based on your logic
+        message: "Success", // Or any relevant message
+        data: {
+            type: 5000,
+            info: {
+                text: text
+            }
+        }
+    };
+    res.status(200).json(response);
+  } else if (modelType === "text_and_image") {
+    const botReply = await textAndImage(req.body.prompt, req.body.imageParts);
+
+    if (botReply?.Error) {
+      return res.status(404).json({ Error: botReply.Error });
+    }
+
+    res.status(200).json({ result: botReply.result });
+  } else {
+    res.status(404).json({ result: "Invalid Model Selected" });
+  }
+};
